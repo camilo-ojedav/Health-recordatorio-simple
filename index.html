@@ -47,26 +47,50 @@
 </div>
 
 <script>
-    // Pedir permiso al cargar
-    if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-      Notification.requestPermission();
+    // Intentar pedir permiso con un botón (los móviles suelen ignorar el pedido automático al cargar)
+    async function solicitarPermiso() {
+      const permiso = await Notification.requestPermission();
+      alert("Estado del permiso: " + permiso);
+    }
+
+    // Función para probar si las notificaciones funcionan ahora mismo
+    function probarNotificacion() {
+      if (Notification.permission === 'granted') {
+        new Notification("✅ ¡Funciona!", {
+          body: "Si ves esto, tus recordatorios llegarán correctamente.",
+          vibrate: [200, 100, 200]
+        });
+      } else {
+        alert("Primero debes dar permiso. Si el botón de arriba no funciona, es porque necesitas abrir esto en un navegador real con HTTPS.");
+      }
     }
 
     let recordatorios = JSON.parse(localStorage.getItem('recordatorios')) || [];
-    let ultimasNotificaciones = {}; // Para evitar repeticiones en el mismo minuto
+    let ultimasNotificaciones = {};
 
     function agregar() {
       const tipo = document.getElementById('tipo').value;
       const nombre = document.getElementById('nombre').value;
       const hora = document.getElementById('hora').value;
 
-      if (!nombre || !hora) return alert('Por favor, completa todos los campos');
+      if (!nombre || !hora) return alert('Completa los campos');
 
       recordatorios.push({ tipo, nombre, hora, id: Date.now() });
       localStorage.setItem('recordatorios', JSON.stringify(recordatorios));
-      
-      document.getElementById('nombre').value = '';
       mostrar();
+    }
+
+    function mostrar() {
+      const lista = document.getElementById('lista');
+      lista.innerHTML = '';
+      recordatorios.forEach(r => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span>${r.hora} - ${r.tipo}: ${r.nombre}</span>
+          <button onclick="borrar(${r.id})" style="width:auto; background:red; margin:0">X</button>
+        `;
+        lista.appendChild(li);
+      });
     }
 
     function borrar(id) {
@@ -75,44 +99,25 @@
       mostrar();
     }
 
-    function mostrar() {
-      const lista = document.getElementById('lista');
-      lista.innerHTML = '';
-      
-      // Ordenar por hora
-      recordatorios.sort((a, b) => a.hora.localeCompare(b.hora));
-
-      recordatorios.forEach(r => {
-        const li = document.createElement('li');
-        // CORRECCIÓN: Uso de backticks `` para plantillas de texto
-        li.innerHTML = `
-          <span><strong>${r.hora}</strong> - ${r.tipo}: ${r.nombre}</span>
-          <button class="btn-delete" onclick="borrar(${r.id})">Eliminar</button>
-        `;
-        lista.appendChild(li);
-      });
-    }
-
     function verificar() {
       const ahora = new Date();
-      const horaActual = ahora.toTimeString().slice(0, 5); // Formato HH:MM
+      const horaActual = ahora.toTimeString().slice(0, 5);
 
       recordatorios.forEach(r => {
         if (r.hora === horaActual && ultimasNotificaciones[r.id] !== horaActual) {
           if (Notification.permission === 'granted') {
-            new Notification('⏰ Recordatorio de Salud', {
-              body: `${r.tipo}: ${r.nombre}`,
-              icon: 'https://cdn-icons-png.flaticon.com/512/504/504230.png' 
-            });
-            // Registrar que ya se notificó en este minuto para este ID
+            new Notification('⏰ Recordatorio', { body: `${r.tipo}: ${r.nombre}` });
+            ultimasNotificaciones[r.id] = horaActual;
+          } else {
+            // Fallback: Si no hay permiso, al menos intenta un alert (esto sí suena en el móvil)
+            alert(`ATENCIÓN: ${r.tipo} - ${r.nombre}`);
             ultimasNotificaciones[r.id] = horaActual;
           }
         }
       });
     }
 
-    // Revisar cada 30 segundos para mayor precisión
-    setInterval(verificar, 30000);
+    setInterval(verificar, 10000); // Revisar cada 10 segundos
     mostrar();
 </script>
 
