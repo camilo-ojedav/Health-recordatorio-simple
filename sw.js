@@ -1,13 +1,17 @@
-// Este archivo se encarga de las notificaciones en segundo plano
-self.addEventListener('push', function(event) {
-    const data = event.data.json();
-    const options = {
-        body: data.body,
-        icon: 'https://cdn-icons-png.flaticon.com/512/504/504230.png',
-        badge: 'https://cdn-icons-png.flaticon.com/512/504/504230.png',
-        vibrate: [200, 100, 200]
-    };
+self.addEventListener('install', (event) => {
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+    event.waitUntil(clients.claim());
+});
+
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
     event.waitUntil(
-        self.registration.showNotification(data.title, options)
+        clients.matchAll({ type: 'window' }).then((clientList) => {
+            if (clientList.length > 0) return clientList[0].focus();
+            return clients.openWindow('/');
+        })
     );
 });
