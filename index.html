@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mis Recordatorios de Salud</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f0f2f5; padding:20px; display: flex; justify-content: center; }
+    .container { max-width: 400px; width: 100%; }
+    h1 { color:#2c3e50; text-align: center; font-size: 24px; }
+    .card { background:#fff; padding:20px; border-radius:12px; margin-bottom:15px; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+    label { display:block; margin-top:10px; font-weight: bold; color: #555; }
+    input, select, button { width: 100%; padding:10px; margin-top:5px; border-radius:8px; border: 1px solid #ccc; box-sizing: border-box; }
+    button { background:#4CAF50; color:white; border:none; font-weight:bold; cursor:pointer; transition: 0.3s; margin-top: 15px; }
+    button:hover { background: #45a049; }
+    .btn-delete { background: #ff4d4d; padding: 5px 10px; width: auto; font-size: 12px; margin-left: 10px; }
+    ul { padding: 0; list-style: none; }
+    li { background: #f9f9f9; margin-bottom: 8px; padding: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #4CAF50; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>🕒 Mis Recordatorios</h1>
+
+  <div class="card">
+    <h3>Agregar recordatorio</h3>
+    <label>Tipo</label>
+    <select id="tipo">
+      <option value="Medicamento">💊 Medicamento</option>
+      <option value="Comida">🍎 Comida</option>
+    </select>
+
+    <label>Nombre</label>
+    <input type="text" id="nombre" placeholder="Ej: Jardiance 10 mg" />
+
+    <label>Hora</label>
+    <input type="time" id="hora" />
+
+    <button onclick="agregar()">Guardar recordatorio</button>
+  </div>
+
+  <div class="card">
+    <h3>Lista de tareas</h3>
+    <ul id="lista"></ul>
+  </div>
+</div>
+
+<script>
+    // Pedir permiso al cargar
+    if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
+
+    let recordatorios = JSON.parse(localStorage.getItem('recordatorios')) || [];
+    let ultimasNotificaciones = {}; // Para evitar repeticiones en el mismo minuto
+
+    function agregar() {
+      const tipo = document.getElementById('tipo').value;
+      const nombre = document.getElementById('nombre').value;
+      const hora = document.getElementById('hora').value;
+
+      if (!nombre || !hora) return alert('Por favor, completa todos los campos');
+
+      recordatorios.push({ tipo, nombre, hora, id: Date.now() });
+      localStorage.setItem('recordatorios', JSON.stringify(recordatorios));
+      
+      document.getElementById('nombre').value = '';
+      mostrar();
+    }
+
+    function borrar(id) {
+      recordatorios = recordatorios.filter(r => r.id !== id);
+      localStorage.setItem('recordatorios', JSON.stringify(recordatorios));
+      mostrar();
+    }
+
+    function mostrar() {
+      const lista = document.getElementById('lista');
+      lista.innerHTML = '';
+      
+      // Ordenar por hora
+      recordatorios.sort((a, b) => a.hora.localeCompare(b.hora));
+
+      recordatorios.forEach(r => {
+        const li = document.createElement('li');
+        // CORRECCIÓN: Uso de backticks `` para plantillas de texto
+        li.innerHTML = `
+          <span><strong>${r.hora}</strong> - ${r.tipo}: ${r.nombre}</span>
+          <button class="btn-delete" onclick="borrar(${r.id})">Eliminar</button>
+        `;
+        lista.appendChild(li);
+      });
+    }
+
+    function verificar() {
+      const ahora = new Date();
+      const horaActual = ahora.toTimeString().slice(0, 5); // Formato HH:MM
+
+      recordatorios.forEach(r => {
+        if (r.hora === horaActual && ultimasNotificaciones[r.id] !== horaActual) {
+          if (Notification.permission === 'granted') {
+            new Notification('⏰ Recordatorio de Salud', {
+              body: `${r.tipo}: ${r.nombre}`,
+              icon: 'https://cdn-icons-png.flaticon.com/512/504/504230.png' 
+            });
+            // Registrar que ya se notificó en este minuto para este ID
+            ultimasNotificaciones[r.id] = horaActual;
+          }
+        }
+      });
+    }
+
+    // Revisar cada 30 segundos para mayor precisión
+    setInterval(verificar, 30000);
+    mostrar();
+</script>
+
+</body>
+</html>
