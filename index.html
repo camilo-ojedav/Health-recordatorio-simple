@@ -47,78 +47,47 @@
 </div>
 
 <script>
-    // Intentar pedir permiso con un botón (los móviles suelen ignorar el pedido automático al cargar)
-    async function solicitarPermiso() {
-      const permiso = await Notification.requestPermission();
-      alert("Estado del permiso: " + permiso);
+    let swReg = null;
+
+    // 1. Registrar el Service Worker al cargar
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      navigator.serviceWorker.register('sw.js')
+        .then(swReg_ => {
+          console.log('Service Worker registrado');
+          swReg = swReg_;
+        })
+        .catch(err => console.error('Error con el SW', err));
     }
 
-    // Función para probar si las notificaciones funcionan ahora mismo
-    function probarNotificacion() {
-      if (Notification.permission === 'granted') {
-        new Notification("✅ ¡Funciona!", {
-          body: "Si ves esto, tus recordatorios llegarán correctamente.",
-          vibrate: [200, 100, 200]
+    // 2. Nueva función para lanzar notificaciones compatibles con Android
+    function lanzarNotificacion(titulo, mensaje) {
+      if (swReg && Notification.permission === 'granted') {
+        swReg.showNotification(titulo, {
+          body: mensaje,
+          icon: 'https://cdn-icons-png.flaticon.com/512/504/504230.png',
+          vibrate: [200, 100, 200],
+          tag: 'recordatorio-' + Date.now() // Evita que se colapsen
         });
-      } else {
-        alert("Primero debes dar permiso. Si el botón de arriba no funciona, es porque necesitas abrir esto en un navegador real con HTTPS.");
+      } else if (Notification.permission === 'granted') {
+        // Fallback para escritorio si el SW no carga
+        new Notification(titulo, { body: mensaje });
       }
     }
 
-    let recordatorios = JSON.parse(localStorage.getItem('recordatorios')) || [];
-    let ultimasNotificaciones = {};
-
-    function agregar() {
-      const tipo = document.getElementById('tipo').value;
-      const nombre = document.getElementById('nombre').value;
-      const hora = document.getElementById('hora').value;
-
-      if (!nombre || !hora) return alert('Completa los campos');
-
-      recordatorios.push({ tipo, nombre, hora, id: Date.now() });
-      localStorage.setItem('recordatorios', JSON.stringify(recordatorios));
-      mostrar();
-    }
-
-    function mostrar() {
-      const lista = document.getElementById('lista');
-      lista.innerHTML = '';
-      recordatorios.forEach(r => {
-        const li = document.createElement('li');
-        li.innerHTML = `
-          <span>${r.hora} - ${r.tipo}: ${r.nombre}</span>
-          <button onclick="borrar(${r.id})" style="width:auto; background:red; margin:0">X</button>
-        `;
-        lista.appendChild(li);
-      });
-    }
-
-    function borrar(id) {
-      recordatorios = recordatorios.filter(r => r.id !== id);
-      localStorage.setItem('recordatorios', JSON.stringify(recordatorios));
-      mostrar();
-    }
-
+    // 3. Tu lógica de verificación actualizada
     function verificar() {
       const ahora = new Date();
       const horaActual = ahora.toTimeString().slice(0, 5);
 
       recordatorios.forEach(r => {
         if (r.hora === horaActual && ultimasNotificaciones[r.id] !== horaActual) {
-          if (Notification.permission === 'granted') {
-            new Notification('⏰ Recordatorio', { body: `${r.tipo}: ${r.nombre}` });
-            ultimasNotificaciones[r.id] = horaActual;
-          } else {
-            // Fallback: Si no hay permiso, al menos intenta un alert (esto sí suena en el móvil)
-            alert(`ATENCIÓN: ${r.tipo} - ${r.nombre}`);
-            ultimasNotificaciones[r.id] = horaActual;
-          }
+          lanzarNotificacion('⏰ Recordatorio de Salud', `${r.tipo}: ${r.nombre}`);
+          ultimasNotificaciones[r.id] = horaActual;
         }
       });
     }
 
-    setInterval(verificar, 5000); // Revisar cada 10 segundos
-    mostrar();
+    setInterval(verificar, 5000);
 </script>
 
 </body>
